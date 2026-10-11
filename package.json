@@ -1,0 +1,12 @@
+{
+  "name": "cham-cong-pro",
+  "version": "1.0.0",
+  "description": "Ung dung Cham Cong Pro",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

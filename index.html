@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chấm Công Pro - Bảng Tính Công & Giờ Làm Thông Minh</title>
+    <meta name="description" content="Ứng dụng theo dõi, chấm công theo tuần, tháng và tính giờ làm việc, lương tự động không cần SQL.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="theme-dark">
+    <div class="app-container">
+        <!-- Sidebar / Navigation Header -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-business-time"></i>
+                </div>
+                <div>
+                    <h1 class="brand-title">Chấm Công <span>PRO</span></h1>
+                    <p class="brand-sub">Quản lý giờ làm & Tính công tự động</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions & Month Picker -->
+            <div class="header-controls">
+                <div class="date-navigator">
+                    <button id="btnPrevPeriod" class="btn-icon" title="Kỳ trước"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="current-period-display" id="periodDisplay">
+                        <i class="fa-regular fa-calendar-days"></i>
+                        <span id="periodText">Tháng 10 / 2026</span>
+                    </div>
+                    <button id="btnNextPeriod" class="btn-icon" title="Kỳ tiếp theo"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button id="btnToday" class="btn-secondary btn-sm" title="Về hôm nay">Hôm nay</button>
+                </div>
+
+                <div class="header-actions">
+                    <button id="btnAutoSaveToggle" class="autosave-badge" title="Tự động đồng bộ vào data/database.js mỗi khi chấm công">
+                        <span class="pulse-dot"></span>
+                        <span id="autoSaveText"><i class="fa-solid fa-floppy-disk"></i> Tự lưu database.js</span>
+                    </button>
+
+                    <div class="view-toggle">
+                        <button class="toggle-btn active" data-view="calendar" id="btnViewCalendar">
+                            <i class="fa-regular fa-calendar"></i> Lịch
+                        </button>
+                        <button class="toggle-btn" data-view="table" id="btnViewTable">
+                            <i class="fa-solid fa-list-check"></i> Bảng biểu
+                        </button>
+                        <button class="toggle-btn" data-view="stats" id="btnViewStats">
+                            <i class="fa-solid fa-chart-pie"></i> Thống kê
+                        </button>
+                    </div>
+
+                    <button id="btnThemeToggle" class="btn-icon theme-toggle" title="Đổi giao diện Sáng / Tối">
+                        <i class="fa-solid fa-moon"></i>
+                    </button>
+                    
+                    <button id="btnSettings" class="btn-icon" title="Cài đặt công thức & Lương">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- KPI Summary Cards -->
+        <section class="summary-section">
+            <div class="kpi-card card-shifts">
+                <div class="kpi-icon"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Tổng Ngày / Công</span>
+                    <div class="kpi-value"><span id="kpiWorkDays">0</span> <small id="kpiStandardDays">/ 26 ngày tính công</small></div>
+                </div>
+                <div class="kpi-badge shift-badge" id="kpiTotalShiftsSub">0.0 công tích lũy</div>
+                <div class="kpi-progress">
+                    <div class="progress-bar" id="kpiShiftProgress" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <div class="kpi-card card-hours">
+                <div class="kpi-icon"><i class="fa-solid fa-clock"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Tổng Giờ Làm</span>
+                    <div class="kpi-value"><span id="kpiTotalHours">0.0</span> <small>giờ</small></div>
+                </div>
+                <div class="kpi-badge" id="kpiAvgHours">TB: 0h/ngày</div>
+            </div>
+
+            <div class="kpi-card card-ot">
+                <div class="kpi-icon"><i class="fa-solid fa-bolt"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Tăng Ca (OT)</span>
+                    <div class="kpi-value"><span id="kpiTotalOT">0.0</span> <small>giờ</small></div>
+                </div>
+                <div class="kpi-badge ot-badge" id="kpiOtDays">0 ngày OT</div>
+            </div>
+
+            <div class="kpi-card card-salary">
+                <div class="kpi-icon"><i class="fa-solid fa-coins"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Tạm Tính Thu Nhập</span>
+                    <div class="kpi-value highlight"><span id="kpiTotalSalary">0</span> <small>đ</small></div>
+                </div>
+                <div class="kpi-badge salary-badge" id="kpiSalarySub">Dựa trên cài đặt</div>
+            </div>
+
+            <div class="kpi-card card-net-salary">
+                <div class="kpi-icon"><i class="fa-solid fa-wallet"></i></div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Tổng Thu Nhập Thực Nhận</span>
+                    <div class="kpi-value highlight-success"><span id="kpiNetSalary">0</span> <small>đ</small></div>
+                </div>
+                <div class="kpi-badge net-badge" id="kpiNetSalarySub">= Tạm tính - BH - Quỹ đoàn</div>
+            </div>
+        </section>
+
+        <!-- Main Workspace Area -->
+        <main class="main-content">
+            <!-- Top Action Toolbar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button id="btnQuickCheckin" class="btn-primary">
+                        <i class="fa-solid fa-fingerprint"></i> Chấm công hôm nay
+                    </button>
+                    <button id="btnBulkFill" class="btn-secondary">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i> Điền nhanh kỳ làm việc
+                    </button>
+                    <button id="btnCalcWageQuick" class="btn-outline">
+                        <i class="fa-solid fa-calculator text-success"></i> Tính lương ngày công
+                    </button>
+                    <button id="btnDirectExportExcel" class="btn-success">
+                        <i class="fa-solid fa-file-excel"></i> Xuất File Excel
+                    </button>
+                    <div class="dropdown">
+                        <button class="btn-outline dropdown-toggle" id="btnExportMenu">
+                            <i class="fa-solid fa-ellipsis-vertical"></i> Khác <i class="fa-solid fa-angle-down"></i>
+                        </button>
+                        <div class="dropdown-menu" id="exportDropdown">
+                            <a href="#" id="btnExportJSON"><i class="fa-solid fa-file-code text-primary"></i> Sao lưu file JSON</a>
+                            <label for="importJSONInput" class="dropdown-item-file">
+                                <i class="fa-solid fa-file-import text-info"></i> Khôi phục từ file JSON
+                                <input type="file" id="importJSONInput" accept=".json" style="display:none;">
+                            </label>
+                            <a href="#" id="btnPrintTimesheet"><i class="fa-solid fa-print"></i> In bảng chấm công</a>
+                            <div class="dropdown-divider"></div>
+                            <a href="#" id="btnClearData" class="text-danger"><i class="fa-solid fa-trash-can"></i> Xóa dữ liệu tháng này</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="toolbar-right">
+                    <div class="filter-group">
+                        <label for="filterStatus"><i class="fa-solid fa-filter"></i> Lọc:</label>
+                        <select id="filterStatus" class="select-sm">
+                            <option value="all">Tất cả trạng thái</option>
+                            <option value="worked">Có đi làm</option>
+                            <option value="ot">Có tăng ca (OT)</option>
+                            <option value="leave_paid">Nghỉ có lương (Phép)</option>
+                            <option value="leave_unpaid">Nghỉ không lương</option>
+                            <option value="holiday">Nghỉ lễ / Tết</option>
+                            <option value="missing">Chưa chấm công</option>
+                        </select>
+                    </div>
+                    <div class="status-legend">
+                        <span class="legend-item"><span class="dot dot-full"></span> Đủ công</span>
+                        <span class="legend-item"><span class="dot dot-half"></span> Nửa công</span>
+                        <span class="legend-item"><span class="dot dot-ot"></span> Tăng ca</span>
+                        <span class="legend-item"><span class="dot dot-leave"></span> Nghỉ làm / Off</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 1: Interactive Calendar View -->
+            <section class="view-panel active" id="calendarView">
+                <div class="calendar-wrapper">
+                    <div class="calendar-header-days">
+                        <div class="day-col-header">Thứ Hai</div>
+                        <div class="day-col-header">Thứ Ba</div>
+                        <div class="day-col-header">Thứ Tư</div>
+                        <div class="day-col-header">Thứ Năm</div>
+                        <div class="day-col-header">Thứ Sáu</div>
+                        <div class="day-col-header weekend">Thứ Bảy</div>
+                        <div class="day-col-header weekend">Chủ Nhật</div>
+                    </div>
+                    <div class="calendar-grid" id="calendarGrid">
+                        <!-- Dynamically generated calendar cells -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 2: Table / Timesheet List View -->
+            <section class="view-panel" id="tableView">
+                <div class="table-container">
+                    <table class="timesheet-table" id="timesheetTable">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">Ngày</th>
+                                <th style="width: 90px;">Thứ</th>
+                                <th style="width: 130px;">Giờ Vào</th>
+                                <th style="width: 130px;">Giờ Ra</th>
+                                <th style="width: 110px;">Tổng Giờ</th>
+                                <th style="width: 110px;">Tăng Ca</th>
+                                <th style="width: 100px;">Số Công</th>
+                                <th style="width: 160px;">Trạng Thái</th>
+                                <th>Ghi Chú</th>
+                                <th style="width: 80px; text-align: center;">Thao Tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="timesheetTableBody">
+                            <!-- Dynamically generated table rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- VIEW 3: Statistics & Analytics View -->
+            <section class="view-panel" id="statsView">
+                <div class="stats-grid">
+                    <div class="stats-card">
+                        <h3><i class="fa-solid fa-chart-column"></i> Biểu đồ số giờ làm việc theo ngày</h3>
+                        <div class="chart-box">
+                            <canvas id="hoursChart" height="240"></canvas>
+                        </div>
+                    </div>
+                    <div class="stats-card">
+                        <h3><i class="fa-solid fa-pie-chart"></i> Phân bổ trạng thái công việc</h3>
+                        <div class="chart-box pie-box">
+                            <canvas id="statusChart" height="240"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-breakdown-card">
+                    <h3><i class="fa-solid fa-calculator"></i> Bảng Phân Tích & Bóc Tách Thu Nhập</h3>
+                    <div class="breakdown-grid" id="breakdownGrid">
+                        <!-- Filled by JS -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- MODAL: Chấm công / Chỉnh sửa ngày -->
+    <div class="modal-backdrop" id="entryModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-business-time"></i>
+                    <div>
+                        <h3 id="modalDateTitle">Chấm Công Ngày: 01/10/2026</h3>
+                        <span id="modalDateSubtitle" class="modal-subtitle">Thứ Năm</span>
+                    </div>
+                </div>
+                <button class="btn-close" id="btnCloseModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="entryForm" class="modal-body">
+                <input type="hidden" id="entryDate">
+
+                <div class="form-row preset-row">
+                    <label>Chọn nhanh ca làm việc:</label>
+                    <div class="preset-chips">
+                        <button type="button" class="chip chip-split" data-split="true" data-in="08:00" data-out="12:00" data-in2="13:00" data-out2="17:00">1 công cắt ca (8h-12h & 13h-17h)</button>
+                        <button type="button" class="chip" data-split="false" data-in="08:00" data-out="16:30" data-lunch="true">1 công liền (8h-16h30 + 30p ăn)</button>
+                        <button type="button" class="chip" data-split="false" data-in="08:00" data-out="17:00" data-lunch="false">Hành chính (8h-17h)</button>
+                        <button type="button" class="chip" data-split="false" data-in="08:00" data-out="12:00" data-lunch="false">0.5 công / Sáng (8h-12h)</button>
+                        <button type="button" class="chip" data-split="false" data-in="13:00" data-out="17:00" data-lunch="false">0.5 công / Chiều (13h-17h)</button>
+                        <button type="button" class="chip" data-split="false" data-in="08:00" data-out="20:00" data-lunch="false">Tăng ca (8h-20h)</button>
+                        <button type="button" class="chip chip-clear" id="btnResetDay"><i class="fa-solid fa-rotate-left"></i> Xóa giờ</button>
+                    </div>
+                </div>
+
+                <!-- Toggle Split Shift (Cắt ca sáng / chiều) -->
+                <div class="form-group">
+                    <label class="checkbox-label split-shift-label">
+                        <input type="checkbox" id="chkSplitShift">
+                        <span><i class="fa-solid fa-code-fork text-primary"></i> <strong>Cắt ca đi về (Sáng làm nửa công, Chiều làm nửa công)</strong></span>
+                    </label>
+                </div>
+
+                <!-- Single Shift Input Group -->
+                <div id="singleShiftBox">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="timeIn"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào:</label>
+                            <input type="time" id="timeIn" class="form-control time-input" value="08:00">
+                        </div>
+
+                        <div class="form-group">
+                            <div class="label-with-badge">
+                                <label for="timeOut"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra:</label>
+                                <span id="autoOutBadge" class="auto-calc-badge" style="display: none;">
+                                    <i class="fa-solid fa-bolt"></i> Tự động +8h
+                                </span>
+                            </div>
+                            <input type="time" id="timeOut" class="form-control time-input" value="16:30">
+                        </div>
+                    </div>
+
+                    <!-- Nút tích Tính tự động giờ ra 4 tiếng / 8 tiếng -->
+                    <div class="auto-calc-out-box">
+                        <div class="auto-calc-header">
+                            <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
+                            <strong>Tính tự động Giờ ra theo Giờ vào:</strong>
+                        </div>
+                        <div class="auto-calc-options">
+                            <label class="checkbox-label auto-calc-label" for="chkAutoOut4h" title="Tự động tính Giờ ra = Giờ vào + 4 tiếng">
+                                <input type="checkbox" id="chkAutoOut4h" name="autoOutDuration" value="4">
+                                <span class="auto-opt-content">
+                                    <i class="fa-regular fa-clock text-info"></i>
+                                    <strong>4 tiếng</strong>
+                                    <small class="badge-tag tag-info">+4h</small>
+                                </span>
+                            </label>
+
+                            <label class="checkbox-label auto-calc-label" for="chkAutoOut8h" title="Tự động tính Giờ ra = Giờ vào + 8 tiếng (hoặc 8.5 tiếng nếu có giờ ăn)">
+                                <input type="checkbox" id="chkAutoOut8h" name="autoOutDuration" value="8">
+                                <span class="auto-opt-content">
+                                    <i class="fa-solid fa-business-time text-success"></i>
+                                    <strong>8 tiếng</strong>
+                                    <small class="badge-tag tag-success">+8h</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div class="auto-calc-hint" id="autoOutHint">
+                            <i class="fa-solid fa-circle-info"></i> <span>Tích chọn để tự tính giờ ra từ Giờ vào; bỏ tích để tự ghi Giờ ra.</span>
+                        </div>
+                    </div>
+
+                    <!-- Lunch break +30m toggle -->
+                    <div class="form-group" style="margin-top: 0.65rem;">
+                        <label class="checkbox-label lunch-break-label">
+                            <input type="checkbox" id="chkLunchBreak">
+                            <span><i class="fa-solid fa-utensils text-warning"></i> <strong>30 phút giờ ăn trưa</strong> <small class="text-muted">(Đủ 8h30p = 1 công, dưới 8h30p = 0.5 công)</small></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Split Shift Input Group (Ca 1 Sáng & Ca 2 Chiều) -->
+                <div id="splitShiftBox" class="split-shift-box" style="display: none;">
+                    <div class="split-card">
+                        <div class="split-header text-primary"><i class="fa-solid fa-sun"></i> <strong>Ca 1 (Ca Sáng):</strong></div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="timeIn1"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào sáng:</label>
+                                <input type="time" id="timeIn1" class="form-control time-input" value="08:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="timeOut1"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra sáng:</label>
+                                <input type="time" id="timeOut1" class="form-control time-input" value="12:00">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-card" style="margin-top: 0.75rem;">
+                        <div class="split-header text-warning"><i class="fa-solid fa-cloud-sun"></i> <strong>Ca 2 (Ca Chiều):</strong></div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="timeIn2"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào chiều:</label>
+                                <input type="time" id="timeIn2" class="form-control time-input" value="13:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="timeOut2"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra chiều:</label>
+                                <input type="time" id="timeOut2" class="form-control time-input" value="17:00">
+                            </div>
+                        </div>
+                    </div>
+                    <small class="form-hint" style="margin-top: 0.5rem; display: block;"><i class="fa-solid fa-circle-info text-info"></i> <strong>Cắt ca:</strong> Tổng số công = Công Ca 1 (Sáng) + Công Ca 2 (Chiều). (VD: Sáng 4h (0.5 công) + Chiều 4h (0.5 công) = <strong>1.0 công</strong>; Sáng 8h (1 công) + Chiều 4h (0.5 công) = <strong>1.5 công</strong>)</small>
+                </div>
+
+                <div class="form-grid entry-status-preview-grid">
+                    <div class="form-group">
+                        <label for="dayStatus"><i class="fa-solid fa-tag"></i> Trạng thái ngày:</label>
+                        <select id="dayStatus" class="form-control">
+                            <option value="worked">Đi làm bình thường</option>
+                            <option value="leave_paid">Nghỉ phép (Có lương)</option>
+                            <option value="leave_unpaid">Nghỉ không lương</option>
+                            <option value="holiday">Nghỉ lễ / Tết</option>
+                            <option value="off">Ngày nghỉ tuần / Không làm</option>
+                        </select>
+                    </div>
+
+                    <!-- Real-time calculation preview box -->
+                    <div class="calc-preview-box">
+                        <div class="preview-item">
+                            <span>Giờ làm:</span>
+                            <strong id="previewTotalHours" class="text-primary">0.0 giờ</strong>
+                        </div>
+                        <div class="preview-item">
+                            <span>Tăng ca:</span>
+                            <strong id="previewOTHours" class="text-warning">0.0 giờ</strong>
+                        </div>
+                        <div class="preview-item">
+                            <span>Quy đổi:</span>
+                            <strong id="previewWorkUnits" class="text-success">0.0 công</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="workNote"><i class="fa-regular fa-note-sticky"></i> Ghi chú công việc:</label>
+                    <textarea id="workNote" class="form-control" rows="1" placeholder="Ghi chú nội dung công việc, lý do đi muộn / về sớm..."></textarea>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-outline text-danger" id="btnDeleteEntry"><i class="fa-solid fa-trash-can"></i> Xóa ngày này</button>
+                    <div class="modal-actions-right">
+                        <button type="button" class="btn-secondary" id="btnCancelModal">Đóng</button>
+                        <button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk"></i> Lưu chấm công</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Cài đặt công thức tính & Tiền lương -->
+    <div class="modal-backdrop" id="settingsModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-calculator"></i>
+                    <div>
+                        <h3>Cài Đặt Tiền Lương & Công Chuẩn</h3>
+                        <span class="modal-subtitle">Tính toán lương ngày công từ lương tháng và số ngày làm</span>
+                    </div>
+                </div>
+                <button class="btn-close" id="btnCloseSettingsModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="settingsForm" class="modal-body">
+                <!-- Bộ tính lương 1 ngày công từ Lương tháng / Số ngày công -->
+                <div class="settings-section">
+                    <h4 class="section-title"><i class="fa-solid fa-calculator text-success"></i> Tính Lương 1 Ngày Công</h4>
+                    <div class="salary-calc-box">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="cfgMonthlySalary"><i class="fa-solid fa-money-bill-wave text-success"></i> Tiền lương tháng (VNĐ):</label>
+                                <input type="number" id="cfgMonthlySalary" class="form-control" min="0" step="100000" value="7800000" placeholder="VD: 7,800,000">
+                            </div>
+                            <div class="form-group">
+                                <label for="cfgStandardDays"><i class="fa-solid fa-calendar-check text-primary"></i> Số ngày công chuẩn:</label>
+                                <input type="number" id="cfgStandardDays" class="form-control" min="1" max="31" step="0.5" value="26" placeholder="VD: 26">
+                            </div>
+                        </div>
+
+                        <!-- Card hiển thị kết quả tính lương 1 ngày công -->
+                        <div class="wage-result-card">
+                            <div class="wage-result-main">
+                                <div class="wage-result-item">
+                                    <span class="wage-result-label"><i class="fa-solid fa-coins text-warning"></i> Tiền công 1 ngày:</span>
+                                    <strong id="lblDailyWageResult" class="wage-result-val text-success">300.000 đ / công</strong>
+                                </div>
+                                <div class="wage-result-item">
+                                    <span class="wage-result-label"><i class="fa-solid fa-clock text-info"></i> Lương 1 giờ làm:</span>
+                                    <strong id="lblHourlyWageResult" class="wage-result-val text-primary">37.500 đ / giờ</strong>
+                                </div>
+                            </div>
+                            <div class="wage-formula-text">
+                                <i class="fa-solid fa-circle-info text-info"></i> Công thức: <span id="lblWageFormulaDesc">7.800.000 đ ÷ 26 công = 300.000 đ/ngày</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4 class="section-title"><i class="fa-solid fa-business-time"></i> Quy định giờ làm & Tăng ca (OT)</h4>
+                    <div class="form-grid-4">
+                        <div class="form-group">
+                            <label for="cfgStandardHours">Giờ/công chuẩn:</label>
+                            <input type="number" id="cfgStandardHours" class="form-control" min="1" max="24" step="0.5" value="8">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgHalfDayHours">Giờ nửa công:</label>
+                            <input type="number" id="cfgHalfDayHours" class="form-control" min="1" max="12" step="0.5" value="4">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgOtThreshold">Ngưỡng OT (giờ):</label>
+                            <input type="number" id="cfgOtThreshold" class="form-control" min="0" max="24" step="0.5" value="8">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgOtRateMultiplier">Hệ số OT:</label>
+                            <input type="number" id="cfgOtRateMultiplier" class="form-control" min="1" max="5" step="0.1" value="1.5">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h4 class="section-title"><i class="fa-solid fa-shield-heart text-danger"></i> Phụ cấp & Các khoản trích trừ lương</h4>
+                    <div class="form-grid-3">
+                        <div class="form-group">
+                            <label for="cfgAllowance"><i class="fa-solid fa-gift text-success"></i> Phụ cấp/Thưởng (VNĐ):</label>
+                            <input type="number" id="cfgAllowance" class="form-control" min="0" step="50000" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgInsurance"><i class="fa-solid fa-heart-pulse text-danger"></i> Đóng bảo hiểm (VNĐ):</label>
+                            <input type="number" id="cfgInsurance" class="form-control" min="0" step="50000" value="0" placeholder="VD: 500,000">
+                        </div>
+                        <div class="form-group">
+                            <label for="cfgUnionFee"><i class="fa-solid fa-users text-warning"></i> Quỹ đoàn (VNĐ):</label>
+                            <input type="number" id="cfgUnionFee" class="form-control" min="0" step="10000" value="0" placeholder="VD: 50,000">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelSettings">Hủy</button>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-check"></i> Lưu Cài Đặt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Điền nhanh hàng loạt (Bulk Fill) -->
+    <div class="modal-backdrop" id="bulkFillModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <div>
+                        <h3>Điền Nhanh Bảng Chấm Công</h3>
+                        <span class="modal-subtitle">Tự động chấm công các ngày trong tháng</span>
+                    </div>
+                </div>
+                <button class="btn-close" id="btnCloseBulkModal"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="bulkFillForm" class="modal-body">
+                <p class="bulk-desc">Chọn quy tắc để tự động điền giờ vào/ra cho các ngày làm việc trong tháng đang chọn:</p>
+                
+                <div class="form-group">
+                    <label for="bulkShiftType"><i class="fa-solid fa-clock"></i> Hình thức ca làm việc:</label>
+                    <select id="bulkShiftType" class="form-control">
+                        <option value="split">Cắt ca về trưa (Sáng 8h-12h & Chiều 13h-17h = 1.0 công)</option>
+                        <option value="admin" selected>Ca Hành chính (8h - 17h)</option>
+                        <option value="single_lunch">1 ca liền (8h - 16h30 có ăn trưa 30p = 1.0 công)</option>
+                        <option value="morning">Nửa công Sáng (8h - 12h = 0.5 công)</option>
+                        <option value="afternoon">Nửa công Chiều (13h - 17h = 0.5 công)</option>
+                        <option value="custom">Tùy chỉnh giờ...</option>
+                    </select>
+                </div>
+
+                <!-- Single Shift in Bulk -->
+                <div id="bulkSingleBox">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="bulkIn"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào:</label>
+                            <input type="time" id="bulkIn" class="form-control time-input" value="08:00">
+                        </div>
+                        <div class="form-group">
+                            <div class="label-with-badge">
+                                <label for="bulkOut"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra:</label>
+                                <span id="bulkAutoOutBadge" class="auto-calc-badge" style="display: none;">
+                                    <i class="fa-solid fa-bolt"></i> Tự động
+                                </span>
+                            </div>
+                            <input type="time" id="bulkOut" class="form-control time-input" value="17:00">
+                        </div>
+                    </div>
+
+                    <!-- Nút tích Tính tự động giờ ra 4 tiếng / 8 tiếng trong Bulk Fill -->
+                    <div class="auto-calc-out-box">
+                        <div class="auto-calc-header">
+                            <i class="fa-solid fa-wand-magic-sparkles text-primary"></i>
+                            <strong>Tính tự động Giờ ra theo Giờ vào:</strong>
+                        </div>
+                        <div class="auto-calc-options">
+                            <label class="checkbox-label auto-calc-label" for="bulkAutoOut4h" title="Tự động tính Giờ ra = Giờ vào + 4 tiếng">
+                                <input type="checkbox" id="bulkAutoOut4h" name="bulkAutoOutDuration" value="4">
+                                <span class="auto-opt-content">
+                                    <i class="fa-regular fa-clock text-info"></i>
+                                    <strong>4 tiếng</strong>
+                                    <small class="badge-tag tag-info">+4h</small>
+                                </span>
+                            </label>
+
+                            <label class="checkbox-label auto-calc-label" for="bulkAutoOut8h" title="Tự động tính Giờ ra = Giờ vào + 8 tiếng">
+                                <input type="checkbox" id="bulkAutoOut8h" name="bulkAutoOutDuration" value="8">
+                                <span class="auto-opt-content">
+                                    <i class="fa-solid fa-business-time text-success"></i>
+                                    <strong>8 tiếng</strong>
+                                    <small class="badge-tag tag-success">+8h</small>
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 0.65rem;">
+                        <label class="checkbox-label lunch-break-label">
+                            <input type="checkbox" id="bulkLunchBreak">
+                            <span><i class="fa-solid fa-utensils text-warning"></i> <strong>30 phút giờ ăn trưa</strong> <small class="text-muted">(Đủ 8h30p = 1 công)</small></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Split Shift in Bulk -->
+                <div id="bulkSplitBox" class="split-shift-box" style="display: none;">
+                    <div class="split-card">
+                        <div class="split-header text-primary"><i class="fa-solid fa-sun"></i> <strong>Ca 1 (Sáng):</strong></div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="bulkIn1"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào sáng:</label>
+                                <input type="time" id="bulkIn1" class="form-control time-input" value="08:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="bulkOut1"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra sáng:</label>
+                                <input type="time" id="bulkOut1" class="form-control time-input" value="12:00">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="split-card" style="margin-top: 0.75rem;">
+                        <div class="split-header text-warning"><i class="fa-solid fa-cloud-sun"></i> <strong>Ca 2 (Chiều):</strong></div>
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="bulkIn2"><i class="fa-solid fa-right-to-bracket text-success"></i> Giờ vào chiều:</label>
+                                <input type="time" id="bulkIn2" class="form-control time-input" value="13:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="bulkOut2"><i class="fa-solid fa-right-from-bracket text-danger"></i> Giờ ra chiều:</label>
+                                <input type="time" id="bulkOut2" class="form-control time-input" value="17:00">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Áp dụng cho những ngày:</label>
+                    <div class="days-checkbox-group">
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="1" checked> Thứ 2</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="2" checked> Thứ 3</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="3" checked> Thứ 4</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="4" checked> Thứ 5</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="5" checked> Thứ 6</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="6"> Thứ 7</label>
+                        <label class="checkbox-label"><input type="checkbox" name="bulkDay" value="0"> Chủ Nhật</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="bulkOverwrite" value="1">
+                        <span>Ghi đè lên cả những ngày đã có dữ liệu chấm công</span>
+                    </label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="btnCancelBulk">Hủy</button>
+                    <button type="submit" class="btn-primary"><i class="fa-solid fa-play"></i> Thực Hiện Điền Nhanh</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="data/database.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
