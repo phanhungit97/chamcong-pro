@@ -85,6 +85,7 @@
         btnExportExcel: document.getElementById('btnExportExcel'),
         btnDirectExportExcel: document.getElementById('btnDirectExportExcel'),
         btnExportJSON: document.getElementById('btnExportJSON'),
+        btnReloadDB: document.getElementById('btnReloadDB'),
         importJSONInput: document.getElementById('importJSONInput'),
         btnPrintTimesheet: document.getElementById('btnPrintTimesheet'),
         btnClearData: document.getElementById('btnClearData'),
@@ -173,6 +174,22 @@
         loadTheme();
         loadRecords();
         setupEventListeners();
+
+        // Tự động chuyển đến tháng có dữ liệu nếu tháng hiện tại chưa có dữ liệu
+        const recKeys = Object.keys(state.records).sort();
+        if (recKeys.length > 0) {
+            const hasCurrentMonth = recKeys.some(k => {
+                const [y, m] = k.split('-').map(Number);
+                return y === state.currentYear && m === (state.currentMonth + 1);
+            });
+            if (!hasCurrentMonth) {
+                const latestDate = recKeys[recKeys.length - 1];
+                const [latestY, latestM] = latestDate.split('-').map(Number);
+                state.currentYear = latestY;
+                state.currentMonth = latestM - 1;
+            }
+        }
+
         renderAll();
         initAutoSave();
     }
@@ -180,14 +197,15 @@
     function loadRecords() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY_DATA);
-            let loaded = raw ? JSON.parse(raw) : null;
+            let localRecords = raw ? JSON.parse(raw) : {};
 
-            // Nếu LocalStorage chưa có gì hoặc rỗng, tự nạp từ file data/database.js trong thư mục
-            if ((!loaded || Object.keys(loaded).length === 0) && window.CHAM_CONG_DEFAULT_DATA && window.CHAM_CONG_DEFAULT_DATA.records) {
-                loaded = { ...window.CHAM_CONG_DEFAULT_DATA.records };
-            }
+            const fileRecords = (window.CHAM_CONG_DEFAULT_DATA && window.CHAM_CONG_DEFAULT_DATA.records)
+                ? window.CHAM_CONG_DEFAULT_DATA.records
+                : {};
 
-            state.records = loaded || {};
+            // Luôn đồng bộ và ưu tiên nạp từ data/database.js:
+            // Gộp dữ liệu để không bao giờ bị mất hoặc bỏ qua các bản ghi trong database.js!
+            state.records = { ...localRecords, ...fileRecords };
 
             // Tự động đồng bộ lại các ngày cắt ca theo công thức tổng 2 ca cộng lại
             let needsSave = false;
@@ -203,7 +221,11 @@
                     }
                 }
             });
-            if (needsSave) saveRecords();
+            if (needsSave) {
+                saveRecords();
+            } else {
+                localStorage.setItem(STORAGE_KEY_DATA, JSON.stringify(state.records));
+            }
         } catch (e) {
             console.error('Lỗi khi đọc dữ liệu:', e);
             state.records = {};
@@ -223,12 +245,14 @@
     function loadSettings() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY_SETTINGS);
-            if (raw) {
-                state.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
-            } else if (window.CHAM_CONG_DEFAULT_DATA && window.CHAM_CONG_DEFAULT_DATA.settings) {
-                state.settings = { ...DEFAULT_SETTINGS, ...window.CHAM_CONG_DEFAULT_DATA.settings };
-                saveSettings();
-            }
+            let localSettings = raw ? JSON.parse(raw) : {};
+
+            const fileSettings = (window.CHAM_CONG_DEFAULT_DATA && window.CHAM_CONG_DEFAULT_DATA.settings)
+                ? window.CHAM_CONG_DEFAULT_DATA.settings
+                : {};
+
+            state.settings = { ...DEFAULT_SETTINGS, ...localSettings, ...fileSettings };
+            localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(state.settings));
         } catch (e) {
             state.settings = { ...DEFAULT_SETTINGS };
         }
@@ -1794,20 +1818,41 @@ window.CHAM_CONG_DEFAULT_DATA = ${JSON.stringify(dataObj, null, 2)};
         showToast('Đã tải file database.js! Hãy lưu/thay thế vào thư mục data/ của dự án.', 'info');
     }
 
-    function reloadFromDatabaseFile() {
-        if (window.CHAM_CONG_DEFAULT_DATA && (window.CHAM_CONG_DEFAULT_DATA.records || window.CHAM_CONG_DEFAULT_DATA.settings)) {
-            if (confirm('Bạn có muốn nạp lại dữ liệu từ file data/database.js trong thư mục?')) {
-                if (window.CHAM_CONG_DEFAULT_DATA.records) {
-                    state.records = { ...state.records, ...window.CHAM_CONG_DEFAULT_DATA.records };
-                    saveRecords();
-                }
-                if (window.CHAM_CONG_DEFAULT_DATA.settings) {
-                    state.settings = { ...DEFAULT_SETTINGS, ...window.CHAM_CONG_DEFAULT_DATA.settings };
-                    saveSettings();
-                }
-                renderAll();
-                showToast('Đã nạp và đồng bộ dữ liệu từ file data/database.js!', 'success');
+    async function reloadFromDatabaseFile() {
+        try {
+            // Thử tải lại database.js từ server để lấy dữ liệu mới nhất
+            const resp = await fetch('data/database.js?t=' + Date.now());
+            if (resp.ok) {
+                const code = await resp.text();
+                // Gán tạm vào window
+                const fn = new Function(code);
+                fn();
             }
+        } catch (e) {
+            console.warn('Không thể fetch database.js:', e);
+        }
+
+        if (window.CHAM_CONG_DEFAULT_DATA && (window.CHAM_CONG_DEFAULT_DATA.records || window.CHAM_CONG_DEFAULT_DATA.settings)) {
+            if (window.CHAM_CONG_DEFAULT_DATA.records) {
+                state.records = { ...state.records, ...window.CHAM_CONG_DEFAULT_DATA.records };
+                saveRecords();
+            }
+            if (window.CHAM_CONG_DEFAULT_DATA.settings) {
+                state.settings = { ...DEFAULT_SETTINGS, ...window.CHAM_CONG_DEFAULT_DATA.settings };
+                saveSettings();
+            }
+
+            // Tự động chuyển tới tháng có dữ liệu
+            const recKeys = Object.keys(state.records).sort();
+            if (recKeys.length > 0) {
+                const latestDate = recKeys[recKeys.length - 1];
+                const [latestY, latestM] = latestDate.split('-').map(Number);
+                state.currentYear = latestY;
+                state.currentMonth = latestM - 1;
+            }
+
+            renderAll();
+            showToast('Đã nạp và đồng bộ dữ liệu từ file data/database.js!', 'success');
         } else {
             showToast('Chưa tìm thấy dữ liệu trong file data/database.js', 'warning');
         }
@@ -2189,6 +2234,13 @@ window.CHAM_CONG_DEFAULT_DATA = ${JSON.stringify(dataObj, null, 2)};
             e.preventDefault();
             exportToJSON();
         });
+
+        if (DOM.btnReloadDB) {
+            DOM.btnReloadDB.addEventListener('click', (e) => {
+                e.preventDefault();
+                reloadFromDatabaseFile();
+            });
+        }
 
         DOM.importJSONInput.addEventListener('change', (e) => {
             if (e.target.files && e.target.files[0]) {
